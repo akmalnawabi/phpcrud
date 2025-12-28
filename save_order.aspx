@@ -81,7 +81,6 @@ protected void Page_Load(object sender, EventArgs e)
             }
 
             // ===== INSERT INTO buy_title =====
-            // order_id از WooCommerce همان NoFact است
             SqlCommand cmd = new SqlCommand(@"
 INSERT INTO dbo.buy_title
 (NoFact,DateFact,SharhFact,CodeMF,SubF,Flag,codet,DateSarResid,
@@ -110,18 +109,21 @@ VALUES
             
             cmd.ExecuteNonQuery();
 
-            // ===== INSERT INTO buy_detaile =====
-            // ستون id خودکار است (IDENTITY) - نباید در INSERT باشد
-            // NoFact همان order_id از WooCommerce است
+            // ===== دریافت آخرین id از buy_detaile برای محاسبه id بعدی =====
+            SqlCommand cmdMaxId = new SqlCommand("SELECT ISNULL(MAX(id), 0) FROM dbo.buy_detaile", conn);
+            int nextId = Convert.ToInt32(cmdMaxId.ExecuteScalar()) + 1;
+
+            // ===== INSERT INTO buy_detaile - با id محاسبه شده =====
             int radif = 1;
             foreach (Dictionary<string, object> item in items)
             {
                 SqlCommand cmdDetail = new SqlCommand(@"
 INSERT INTO dbo.buy_detaile
-(NoFact,codeK,NoAnbar,Radif,Sharh,Tedad,Pool,price_sale,SabtOkInt)
+(id,NoFact,codeK,NoAnbar,Radif,Sharh,Tedad,Pool,price_sale,SabtOkInt)
 VALUES
-(@NoFact,@codeK,1,@Radif,@Sharh,@Tedad,@Pool,@price_sale,1)", conn);
+(@id,@NoFact,@codeK,1,@Radif,@Sharh,@Tedad,@Pool,@price_sale,1)", conn);
 
+                cmdDetail.Parameters.AddWithValue("@id", nextId++);
                 cmdDetail.Parameters.AddWithValue("@NoFact", data["order_id"].ToString());
                 cmdDetail.Parameters.AddWithValue("@codeK", item.ContainsKey("sku") ? item["sku"].ToString().Trim() : "");
                 cmdDetail.Parameters.AddWithValue("@Radif", radif++);
