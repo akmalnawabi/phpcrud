@@ -80,7 +80,8 @@ protected void Page_Load(object sender, EventArgs e)
                 customerName = "سفارش #" + data["order_id"].ToString();
             }
 
-            // ===== INSERT INTO buy_title - بدون timestamp =====
+            // ===== INSERT INTO buy_title =====
+            // order_id از WooCommerce همان NoFact است
             SqlCommand cmd = new SqlCommand(@"
 INSERT INTO dbo.buy_title
 (NoFact,DateFact,SharhFact,CodeMF,SubF,Flag,codet,DateSarResid,
@@ -109,7 +110,9 @@ VALUES
             
             cmd.ExecuteNonQuery();
 
-            // ===== INSERT INTO buy_detaile - بدون timestamp =====
+            // ===== INSERT INTO buy_detaile =====
+            // ستون id خودکار است (IDENTITY) - نباید در INSERT باشد
+            // NoFact همان order_id از WooCommerce است
             int radif = 1;
             foreach (Dictionary<string, object> item in items)
             {
