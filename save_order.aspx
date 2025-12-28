@@ -80,15 +80,15 @@ protected void Page_Load(object sender, EventArgs e)
                 customerName = "سفارش #" + data["order_id"].ToString();
             }
 
-            // ===== INSERT INTO buy_title - فیلدهای ناموجود حذف شدند =====
+            // ===== INSERT INTO buy_title - بدون timestamp =====
             SqlCommand cmd = new SqlCommand(@"
 INSERT INTO dbo.buy_title
-(NoFact,DateFact,SharhFact,CodeMF,SubF,Flag,codet,time1,DateSarResid,
+(NoFact,DateFact,SharhFact,CodeMF,SubF,Flag,codet,DateSarResid,
 khadamat,darsadarzesh,poolarzesh,
 flagtasvietemp,flagtasvie,flagtasvietempanbar,SabtOkInt,
 subTedad,subPool,subNaghd,nofactExcel,codep,RealNoFact,FLAGERSAL)
 VALUES
-(@NoFact,@DateFact,@SharhFact,@CodeMF,@SubF,'WC',1,GETDATE(),@DateSarResid,
+(@NoFact,@DateFact,@SharhFact,@CodeMF,@SubF,'WC',1,@DateSarResid,
 0,0,0,
 '0','0','0',1,
 @subTedad,@subPool,@subNaghd,@nofactExcel,@codep,@RealNoFact,'0')", conn);
@@ -109,15 +109,15 @@ VALUES
             
             cmd.ExecuteNonQuery();
 
-            // ===== INSERT INTO buy_detaile =====
+            // ===== INSERT INTO buy_detaile - بدون timestamp =====
             int radif = 1;
             foreach (Dictionary<string, object> item in items)
             {
                 SqlCommand cmdDetail = new SqlCommand(@"
 INSERT INTO dbo.buy_detaile
-(NoFact,codeK,NoAnbar,Radif,Sharh,Tedad,Pool,price_sale,SabtOkInt,datetimex)
+(NoFact,codeK,NoAnbar,Radif,Sharh,Tedad,Pool,price_sale,SabtOkInt)
 VALUES
-(@NoFact,@codeK,1,@Radif,@Sharh,@Tedad,@Pool,@price_sale,1,GETDATE())", conn);
+(@NoFact,@codeK,1,@Radif,@Sharh,@Tedad,@Pool,@price_sale,1)", conn);
 
                 cmdDetail.Parameters.AddWithValue("@NoFact", data["order_id"].ToString());
                 cmdDetail.Parameters.AddWithValue("@codeK", item.ContainsKey("sku") ? item["sku"].ToString().Trim() : "");
@@ -142,5 +142,4 @@ VALUES
         Response.Write("{\"status\":\"error\",\"message\":\"خطا: " + ex.Message.Replace("\"", "'").Replace("\r\n", " ") + "\"}");
     }
 }
-// new
 </script>
