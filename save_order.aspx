@@ -29,25 +29,58 @@ protected void Page_Load(object sender, EventArgs e)
             return;
         }
 
-        if (data["items"] == null || !(data["items"] is System.Collections.ArrayList))
+        // بررسی انواع مختلف آرایه
+        object itemsObj = data["items"];
+        System.Collections.IList items = null;
+        
+        if (itemsObj is System.Collections.ArrayList)
+        {
+            items = (System.Collections.ArrayList)itemsObj;
+        }
+        else if (itemsObj is object[])
+        {
+            var arr = (object[])itemsObj;
+            items = new System.Collections.ArrayList(arr);
+        }
+        else if (itemsObj is System.Collections.Generic.List<object>)
+        {
+            var list = (System.Collections.Generic.List<object>)itemsObj;
+            items = new System.Collections.ArrayList(list);
+        }
+        else
         {
             Response.Write("{\"status\":\"error\",\"message\":\"آیتم‌ها نامعتبر است\"}");
             return;
         }
 
-        var items = (System.Collections.ArrayList)data["items"];
-        if (items.Count == 0)
+        if (items == null || items.Count == 0)
         {
             Response.Write("{\"status\":\"error\",\"message\":\"هیچ آیتمی وجود ندارد\"}");
             return;
         }
 
-        // رشته اتصال مطابق با get_kalas.aspx
         string connectionString = "Server=194.5.195.93;Database=millionaire;User Id=sa;Password=2901;";
 
         using (SqlConnection conn = new SqlConnection(connectionString))
         {
             conn.Open();
+
+            // ترکیب نام و نام خانوادگی برای SharhFact
+            string firstName = data.ContainsKey("first_name") ? data["first_name"].ToString().Trim() : "";
+            string lastName = data.ContainsKey("last_name") ? data["last_name"].ToString().Trim() : "";
+            string customerName = data.ContainsKey("customer") ? data["customer"].ToString().Trim() : "";
+            
+            // اگر customer خالی است، از first_name و last_name استفاده کن
+            if (string.IsNullOrEmpty(customerName) && (!string.IsNullOrEmpty(firstName) || !string.IsNullOrEmpty(lastName)))
+            {
+                customerName = (firstName + " " + lastName).Trim();
+            }
+            
+            // اگر هنوز خالی است، از order_id استفاده کن
+            if (string.IsNullOrEmpty(customerName))
+            {
+                customerName = "سفارش #" + data["order_id"].ToString();
+            }
 
             // ===== INSERT INTO buy_title =====
             SqlCommand cmd = new SqlCommand(@"
@@ -64,8 +97,9 @@ VALUES
             cmd.Parameters.AddWithValue("@NoFact", data["order_id"].ToString());
             cmd.Parameters.AddWithValue("@DateFact", DateTime.Now.ToString("yyyy/MM/dd"));
             cmd.Parameters.AddWithValue("@DateSarResid", DateTime.Now.ToString("yyyy/MM/dd"));
-            cmd.Parameters.AddWithValue("@SharhFact", data.ContainsKey("customer") ? data["customer"].ToString().Trim() : "");
-            cmd.Parameters.AddWithValue("@CodeMF", data.ContainsKey("mobile") ? data["mobile"].ToString().Trim() : "");
+            cmd.Parameters.AddWithValue("@SharhFact", customerName); // نام و نام خانوادگی
+            cmd.Parameters.AddWithValue("@CodeMF", data.ContainsKey("mobile") ? data["mobile"].ToString().Trim() : 
+                                                      (data.ContainsKey("phone") ? data["phone"].ToString().Trim() : ""));
             cmd.Parameters.AddWithValue("@SubF", Convert.ToDecimal(data.ContainsKey("total") ? data["total"] : "0"));
             cmd.Parameters.AddWithValue("@subTedad", items.Count);
             cmd.Parameters.AddWithValue("@subPool", Convert.ToDecimal(data.ContainsKey("total") ? data["total"] : "0"));
