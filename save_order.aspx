@@ -70,34 +70,33 @@ protected void Page_Load(object sender, EventArgs e)
             string lastName = data.ContainsKey("last_name") ? data["last_name"].ToString().Trim() : "";
             string customerName = data.ContainsKey("customer") ? data["customer"].ToString().Trim() : "";
             
-            // اگر customer خالی است، از first_name و last_name استفاده کن
             if (string.IsNullOrEmpty(customerName) && (!string.IsNullOrEmpty(firstName) || !string.IsNullOrEmpty(lastName)))
             {
                 customerName = (firstName + " " + lastName).Trim();
             }
             
-            // اگر هنوز خالی است، از order_id استفاده کن
             if (string.IsNullOrEmpty(customerName))
             {
                 customerName = "سفارش #" + data["order_id"].ToString();
             }
 
-            // ===== INSERT INTO buy_title =====
+            // ===== INSERT INTO buy_title - فیلدهای ناموجود حذف شدند =====
             SqlCommand cmd = new SqlCommand(@"
 INSERT INTO dbo.buy_title
 (NoFact,DateFact,SharhFact,CodeMF,SubF,Flag,codet,time1,DateSarResid,
-khadamat,darsadarzesh,poolarzesh,darsadmalit,poolmalit,Imaliatkasr,
+khadamat,darsadarzesh,poolarzesh,
 flagtasvietemp,flagtasvie,flagtasvietempanbar,SabtOkInt,
 subTedad,subPool,subNaghd,nofactExcel,codep,RealNoFact,FLAGERSAL)
 VALUES
 (@NoFact,@DateFact,@SharhFact,@CodeMF,@SubF,'WC',1,GETDATE(),@DateSarResid,
-0,0,0,0,0,0,'0','0','0',1,
+0,0,0,
+'0','0','0',1,
 @subTedad,@subPool,@subNaghd,@nofactExcel,@codep,@RealNoFact,'0')", conn);
 
             cmd.Parameters.AddWithValue("@NoFact", data["order_id"].ToString());
             cmd.Parameters.AddWithValue("@DateFact", DateTime.Now.ToString("yyyy/MM/dd"));
             cmd.Parameters.AddWithValue("@DateSarResid", DateTime.Now.ToString("yyyy/MM/dd"));
-            cmd.Parameters.AddWithValue("@SharhFact", customerName); // نام و نام خانوادگی
+            cmd.Parameters.AddWithValue("@SharhFact", customerName);
             cmd.Parameters.AddWithValue("@CodeMF", data.ContainsKey("mobile") ? data["mobile"].ToString().Trim() : 
                                                       (data.ContainsKey("phone") ? data["phone"].ToString().Trim() : ""));
             cmd.Parameters.AddWithValue("@SubF", Convert.ToDecimal(data.ContainsKey("total") ? data["total"] : "0"));
