@@ -142,4 +142,5 @@ VALUES
         Response.Write("{\"status\":\"error\",\"message\":\"خطا: " + ex.Message.Replace("\"", "'").Replace("\r\n", " ") + "\"}");
     }
 }
+// new
 </script>
