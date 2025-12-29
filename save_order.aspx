@@ -10,6 +10,8 @@ protected void Page_Load(object sender, EventArgs e)
     Response.ContentType = "application/json";
     Response.Charset = "utf-8";
     
+    string orderIdStr = ""; // تعریف در scope بالاتر
+    
     try
     {
         string body = new StreamReader(Request.InputStream).ReadToEnd();
@@ -124,11 +126,15 @@ protected void Page_Load(object sender, EventArgs e)
             
             if (string.IsNullOrEmpty(customerName))
             {
-                customerName = "سفارش #" + data["order_id"].ToString();
+                orderIdStr = data["order_id"].ToString().Trim();
+                customerName = "سفارش #" + orderIdStr;
+            }
+            else
+            {
+                orderIdStr = data["order_id"].ToString().Trim();
             }
 
             // تبدیل order_id
-            string orderIdStr = data["order_id"].ToString().Trim();
             long orderIdLong = 0;
             if (!long.TryParse(orderIdStr, out orderIdLong))
             {
