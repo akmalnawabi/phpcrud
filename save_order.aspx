@@ -10,7 +10,7 @@ protected void Page_Load(object sender, EventArgs e)
     Response.ContentType = "application/json";
     Response.Charset = "utf-8";
     
-    string orderIdStr = ""; // تعریف در scope بالاتر
+    string orderIdStr = "";
     
     try
     {
@@ -35,33 +35,15 @@ protected void Page_Load(object sender, EventArgs e)
             return;
         }
 
-        if (data == null)
+        if (data == null || !data.ContainsKey("order_id") || !data.ContainsKey("items"))
         {
-            Response.Write("{\"status\":\"error\",\"message\":\"داده null است\"}");
-            return;
-        }
-
-        if (!data.ContainsKey("order_id"))
-        {
-            Response.Write("{\"status\":\"error\",\"message\":\"order_id وجود ندارد\"}");
-            return;
-        }
-
-        if (!data.ContainsKey("items"))
-        {
-            Response.Write("{\"status\":\"error\",\"message\":\"items وجود ندارد\"}");
+            Response.Write("{\"status\":\"error\",\"message\":\"داده‌های ناقص\"}");
             return;
         }
 
         // بررسی انواع مختلف آرایه
         object itemsObj = data["items"];
         System.Collections.IList items = null;
-        
-        if (itemsObj == null)
-        {
-            Response.Write("{\"status\":\"error\",\"message\":\"items null است\"}");
-            return;
-        }
         
         if (itemsObj is System.Collections.ArrayList)
         {
@@ -79,7 +61,7 @@ protected void Page_Load(object sender, EventArgs e)
         }
         else
         {
-            Response.Write("{\"status\":\"error\",\"message\":\"آیتم‌ها نامعتبر است - نوع: " + itemsObj.GetType().Name + "\"}");
+            Response.Write("{\"status\":\"error\",\"message\":\"آیتم‌ها نامعتبر است\"}");
             return;
         }
 
@@ -93,31 +75,36 @@ protected void Page_Load(object sender, EventArgs e)
 
         using (SqlConnection conn = new SqlConnection(connectionString))
         {
-            try
+            conn.Open();
+
+            // دریافت آخرین NoFact از دیتابیس
+            SqlCommand cmdMaxNoFact = new SqlCommand("SELECT ISNULL(MAX(NoFact), 0) FROM dbo.sale_title", conn);
+            long lastNoFact = Convert.ToInt64(cmdMaxNoFact.ExecuteScalar());
+            long newNoFact = lastNoFact + 1;
+
+            // بررسی اینکه آیا order_id از WordPress تکراری است
+            long wordpressOrderId = 0;
+            if (long.TryParse(data["order_id"].ToString(), out wordpressOrderId))
             {
-                conn.Open();
-            }
-            catch (SqlException connEx)
-            {
-                Response.Write("{\"status\":\"error\",\"message\":\"خطا در اتصال به دیتابیس: " + connEx.Message.Replace("\"", "'") + "\"}");
-                return;
+                // بررسی وجود order_id در دیتابیس
+                SqlCommand cmdCheck = new SqlCommand("SELECT COUNT(*) FROM dbo.sale_title WHERE NoFact = @NoFact", conn);
+                cmdCheck.Parameters.AddWithValue("@NoFact", wordpressOrderId);
+                int exists = Convert.ToInt32(cmdCheck.ExecuteScalar());
+                
+                if (exists == 0)
+                {
+                    // اگر تکراری نیست، از order_id WordPress استفاده می‌کنیم
+                    newNoFact = wordpressOrderId;
+                }
+                // اگر تکراری است، از newNoFact استفاده می‌کنیم (که از MAX + 1 محاسبه شده)
             }
 
+            orderIdStr = newNoFact.ToString();
+
             // ترکیب نام و نام خانوادگی برای appEmza
-            string firstName = "";
-            string lastName = "";
-            string customerName = "";
-            
-            try
-            {
-                firstName = data.ContainsKey("first_name") ? data["first_name"].ToString().Trim() : "";
-                lastName = data.ContainsKey("last_name") ? data["last_name"].ToString().Trim() : "";
-                customerName = data.ContainsKey("customer") ? data["customer"].ToString().Trim() : "";
-            }
-            catch
-            {
-                customerName = "";
-            }
+            string firstName = data.ContainsKey("first_name") ? data["first_name"].ToString().Trim() : "";
+            string lastName = data.ContainsKey("last_name") ? data["last_name"].ToString().Trim() : "";
+            string customerName = data.ContainsKey("customer") ? data["customer"].ToString().Trim() : "";
             
             if (string.IsNullOrEmpty(customerName) && (!string.IsNullOrEmpty(firstName) || !string.IsNullOrEmpty(lastName)))
             {
@@ -126,88 +113,41 @@ protected void Page_Load(object sender, EventArgs e)
             
             if (string.IsNullOrEmpty(customerName))
             {
-                orderIdStr = data["order_id"].ToString().Trim();
                 customerName = "سفارش #" + orderIdStr;
-            }
-            else
-            {
-                orderIdStr = data["order_id"].ToString().Trim();
-            }
-
-            // تبدیل order_id
-            long orderIdLong = 0;
-            if (!long.TryParse(orderIdStr, out orderIdLong))
-            {
-                Response.Write("{\"status\":\"error\",\"message\":\"order_id نامعتبر است: " + orderIdStr + "\"}");
-                return;
             }
 
             // دریافت سایر فیلدها
-            string sharhFact = "";
-            string codeMF = "";
-            string codep = "";
+            string sharhFact = data.ContainsKey("order_notes") ? data["order_notes"].ToString().Trim() : "";
+            string codeMF = data.ContainsKey("mobile") ? data["mobile"].ToString().Trim() : 
+                           (data.ContainsKey("phone") ? data["phone"].ToString().Trim() : "");
+            string codep = data.ContainsKey("email") ? data["email"].ToString().Trim() : "";
             decimal subF = 0;
-            
-            try
+            if (data.ContainsKey("total"))
             {
-                sharhFact = data.ContainsKey("order_notes") ? data["order_notes"].ToString().Trim() : "";
-                codeMF = data.ContainsKey("mobile") ? data["mobile"].ToString().Trim() : 
-                         (data.ContainsKey("phone") ? data["phone"].ToString().Trim() : "");
-                codep = data.ContainsKey("email") ? data["email"].ToString().Trim() : "";
-                
-                if (data.ContainsKey("total"))
-                {
-                    decimal.TryParse(data["total"].ToString(), out subF);
-                }
-            }
-            catch (Exception fieldEx)
-            {
-                Response.Write("{\"status\":\"error\",\"message\":\"خطا در خواندن فیلدها: " + fieldEx.Message.Replace("\"", "'") + "\"}");
-                return;
+                decimal.TryParse(data["total"].ToString(), out subF);
             }
 
             // ===== INSERT INTO sale_title =====
-            try
-            {
-                SqlCommand cmd = new SqlCommand(@"
+            SqlCommand cmd = new SqlCommand(@"
 INSERT INTO dbo.sale_title
 (NoFact,DateFact,SharhFact,CodeMF,SubF,Flag,codep,appEmza)
 VALUES
 (@NoFact,@DateFact,@SharhFact,@CodeMF,@SubF,@Flag,@codep,@appEmza)", conn);
 
-                cmd.Parameters.AddWithValue("@NoFact", orderIdLong);
-                cmd.Parameters.AddWithValue("@DateFact", DateTime.Now.ToString("yyyy/MM/dd"));
-                cmd.Parameters.AddWithValue("@SharhFact", sharhFact);
-                cmd.Parameters.AddWithValue("@CodeMF", codeMF);
-                cmd.Parameters.AddWithValue("@SubF", subF);
-                cmd.Parameters.AddWithValue("@Flag", "WC");
-                cmd.Parameters.AddWithValue("@codep", codep);
-                cmd.Parameters.AddWithValue("@appEmza", customerName);
-                
-                cmd.ExecuteNonQuery();
-            }
-            catch (SqlException insertEx)
-            {
-                Response.Write("{\"status\":\"error\",\"message\":\"خطا در INSERT sale_title: " + insertEx.Message.Replace("\"", "'").Replace("\r\n", " ") + "\"}");
-                return;
-            }
+            cmd.Parameters.AddWithValue("@NoFact", newNoFact);
+            cmd.Parameters.AddWithValue("@DateFact", DateTime.Now.ToString("yyyy/MM/dd"));
+            cmd.Parameters.AddWithValue("@SharhFact", sharhFact);
+            cmd.Parameters.AddWithValue("@CodeMF", codeMF);
+            cmd.Parameters.AddWithValue("@SubF", subF);
+            cmd.Parameters.AddWithValue("@Flag", "WC");
+            cmd.Parameters.AddWithValue("@codep", codep);
+            cmd.Parameters.AddWithValue("@appEmza", customerName);
+            
+            cmd.ExecuteNonQuery();
 
             // ===== دریافت آخرین id از sale_detaile =====
-            int nextId = 1;
-            try
-            {
-                SqlCommand cmdMaxId = new SqlCommand("SELECT ISNULL(MAX(id), 0) FROM dbo.sale_detaile", conn);
-                object maxIdObj = cmdMaxId.ExecuteScalar();
-                if (maxIdObj != null && maxIdObj != DBNull.Value)
-                {
-                    nextId = Convert.ToInt32(maxIdObj) + 1;
-                }
-            }
-            catch (Exception maxIdEx)
-            {
-                Response.Write("{\"status\":\"error\",\"message\":\"خطا در دریافت MAX(id): " + maxIdEx.Message.Replace("\"", "'") + "\"}");
-                return;
-            }
+            SqlCommand cmdMaxId = new SqlCommand("SELECT ISNULL(MAX(id), 0) FROM dbo.sale_detaile", conn);
+            int nextId = Convert.ToInt32(cmdMaxId.ExecuteScalar()) + 1;
 
             // ===== INSERT INTO sale_detaile =====
             int radif = 1;
@@ -215,55 +155,30 @@ VALUES
             
             foreach (Dictionary<string, object> item in items)
             {
-                try
-                {
-                    string codeK = "";
-                    string sharh = "";
-                    decimal tedad = 0;
-                    decimal pool = 0;
-                    
-                    if (item.ContainsKey("sku"))
-                    {
-                        codeK = item["sku"].ToString().Trim();
-                    }
-                    
-                    if (item.ContainsKey("name"))
-                    {
-                        sharh = item["name"].ToString().Trim();
-                    }
-                    
-                    if (item.ContainsKey("qty"))
-                    {
-                        decimal.TryParse(item["qty"].ToString(), out tedad);
-                    }
-                    
-                    if (item.ContainsKey("total"))
-                    {
-                        decimal.TryParse(item["total"].ToString(), out pool);
-                    }
+                string codeK = item.ContainsKey("sku") ? item["sku"].ToString().Trim() : "";
+                string sharh = item.ContainsKey("name") ? item["name"].ToString().Trim() : "";
+                decimal tedad = 0;
+                decimal pool = 0;
+                
+                decimal.TryParse(item.ContainsKey("qty") ? item["qty"].ToString() : "0", out tedad);
+                decimal.TryParse(item.ContainsKey("total") ? item["total"].ToString() : "0", out pool);
 
-                    SqlCommand cmdDetail = new SqlCommand(@"
+                SqlCommand cmdDetail = new SqlCommand(@"
 INSERT INTO dbo.sale_detaile
 (id,NoFact,codeK,NoAnbar,Radif,Sharh,Tedad,Pool,SabtOkInt)
 VALUES
 (@id,@NoFact,@codeK,1,@Radif,@Sharh,@Tedad,@Pool,1)", conn);
 
-                    cmdDetail.Parameters.AddWithValue("@id", nextId++);
-                    cmdDetail.Parameters.AddWithValue("@NoFact", orderIdLong);
-                    cmdDetail.Parameters.AddWithValue("@codeK", codeK);
-                    cmdDetail.Parameters.AddWithValue("@Radif", radif++);
-                    cmdDetail.Parameters.AddWithValue("@Sharh", sharh);
-                    cmdDetail.Parameters.AddWithValue("@Tedad", tedad);
-                    cmdDetail.Parameters.AddWithValue("@Pool", pool);
-                    
-                    cmdDetail.ExecuteNonQuery();
-                    insertedCount++;
-                }
-                catch (Exception itemEx)
-                {
-                    Response.Write("{\"status\":\"error\",\"message\":\"خطا در ذخیره آیتم ردیف " + radif + ": " + itemEx.Message.Replace("\"", "'").Replace("\r\n", " ") + "\"}");
-                    return;
-                }
+                cmdDetail.Parameters.AddWithValue("@id", nextId++);
+                cmdDetail.Parameters.AddWithValue("@NoFact", newNoFact);
+                cmdDetail.Parameters.AddWithValue("@codeK", codeK);
+                cmdDetail.Parameters.AddWithValue("@Radif", radif++);
+                cmdDetail.Parameters.AddWithValue("@Sharh", sharh);
+                cmdDetail.Parameters.AddWithValue("@Tedad", tedad);
+                cmdDetail.Parameters.AddWithValue("@Pool", pool);
+                
+                cmdDetail.ExecuteNonQuery();
+                insertedCount++;
             }
 
             if (insertedCount == 0)
@@ -273,14 +188,24 @@ VALUES
             }
         }
 
-        var result = new { status = "ok", message = "سفارش با موفقیت ذخیره شد", order_id = orderIdStr };
+        var result = new { 
+            status = "ok", 
+            message = "سفارش با موفقیت ذخیره شد", 
+            order_id = orderIdStr,
+            wordpress_order_id = data["order_id"].ToString()
+        };
         var serializer = new JavaScriptSerializer();
         Response.Write(serializer.Serialize(result));
+    }
+    catch (SqlException sqlEx)
+    {
+        Response.StatusCode = 500;
+        Response.Write("{\"status\":\"error\",\"message\":\"خطای SQL: " + sqlEx.Message.Replace("\"", "'").Replace("\r\n", " ") + "\"}");
     }
     catch (Exception ex)
     {
         Response.StatusCode = 500;
-        Response.Write("{\"status\":\"error\",\"message\":\"خطای عمومی: " + ex.Message.Replace("\"", "'").Replace("\r\n", " ") + "\"}");
+        Response.Write("{\"status\":\"error\",\"message\":\"خطا: " + ex.Message.Replace("\"", "'").Replace("\r\n", " ") + "\"}");
     }
 }
 </script>
