@@ -73,34 +73,17 @@
                 return;
             }
             
-            // تولید codeM یونیک (10 کاراکتر)
-            string codeM = Guid.NewGuid().ToString().Replace("-", "").Substring(0, 10).ToUpper();
+            // تولید codeM به صورت bigint (عدد یونیک)
+            // استفاده از timestamp + عدد تصادفی برای یونیک بودن
+            long codeM = DateTime.Now.Ticks % 10000000000; // 10 رقم آخر از Ticks
+            Random rnd = new Random();
+            codeM = codeM * 1000 + rnd.Next(0, 999); // اضافه کردن 3 رقم تصادفی
             
-            // تبدیل موبایل و کد پستی به عدد (اگر فیلد bigint باشد)
-            long? mobailM_long = null;
-            long? postM_long = null;
+            // اگر codeM منفی شد، مثبت می‌کنیم
+            if (codeM < 0) codeM = Math.Abs(codeM);
             
-            // حذف کاراکترهای غیر عددی از موبایل (مثل فاصله، خط تیره و ...)
-            string mobailM_clean = mobailM.Replace(" ", "").Replace("-", "").Replace("(", "").Replace(")", "").Replace("+", "");
-            if (!string.IsNullOrEmpty(mobailM_clean))
-            {
-                long tempMobail;
-                if (long.TryParse(mobailM_clean, out tempMobail))
-                {
-                    mobailM_long = tempMobail;
-                }
-            }
-            
-            // حذف کاراکترهای غیر عددی از کد پستی
-            string postM_clean = postM.Replace(" ", "").Replace("-", "");
-            if (!string.IsNullOrEmpty(postM_clean))
-            {
-                long tempPost;
-                if (long.TryParse(postM_clean, out tempPost))
-                {
-                    postM_long = tempPost;
-                }
-            }
+            // فرمت تاریخ برای datet (nvarchar(10)) - فرمت: YYYY/MM/DD
+            string datet = DateTime.Now.ToString("yyyy/MM/dd");
             
             // اتصال به دیتابیس
             string connectionString = "Server=194.5.195.93;Database=millionaire;User Id=sa;Password=2901;";
@@ -129,43 +112,47 @@
                     
                     using (SqlCommand cmd = new SqlCommand(query, conn))
                     {
+                        // codeM باید bigint باشد
                         cmd.Parameters.AddWithValue("@codeM", codeM);
-                        cmd.Parameters.AddWithValue("@nameM", string.IsNullOrEmpty(nameM) ? (object)DBNull.Value : nameM);
+                        
+                        // nameM - nvarchar(35)
+                        cmd.Parameters.AddWithValue("@nameM", string.IsNullOrEmpty(nameM) ? (object)DBNull.Value : (nameM.Length > 35 ? nameM.Substring(0, 35) : nameM));
+                        
+                        // Tel1M - varchar(15)
                         cmd.Parameters.AddWithValue("@Tel1M", DBNull.Value);
                         
-                        // اگر mobailM از نوع bigint است، عدد ارسال می‌کنیم
-                        if (mobailM_long.HasValue)
-                        {
-                            cmd.Parameters.AddWithValue("@mobailM", mobailM_long.Value);
-                        }
-                        else
-                        {
-                            cmd.Parameters.AddWithValue("@mobailM", DBNull.Value);
-                        }
+                        // mobailM - varchar(50)
+                        cmd.Parameters.AddWithValue("@mobailM", string.IsNullOrEmpty(mobailM) ? (object)DBNull.Value : (mobailM.Length > 50 ? mobailM.Substring(0, 50) : mobailM));
                         
-                        // اگر postM از نوع bigint است، عدد ارسال می‌کنیم
-                        if (postM_long.HasValue)
-                        {
-                            cmd.Parameters.AddWithValue("@postM", postM_long.Value);
-                        }
-                        else
-                        {
-                            cmd.Parameters.AddWithValue("@postM", DBNull.Value);
-                        }
+                        // postM - varchar(20)
+                        cmd.Parameters.AddWithValue("@postM", string.IsNullOrEmpty(postM) ? (object)DBNull.Value : (postM.Length > 20 ? postM.Substring(0, 20) : postM));
                         
+                        // tedadkol - int
                         cmd.Parameters.AddWithValue("@tedadkol", DBNull.Value);
-                        cmd.Parameters.AddWithValue("@adresM", string.IsNullOrEmpty(city) ? (object)DBNull.Value : city);
-                        cmd.Parameters.AddWithValue("@MemM", string.IsNullOrEmpty(email) ? (object)DBNull.Value : email);
+                        
+                        // adresM - varchar(150)
+                        cmd.Parameters.AddWithValue("@adresM", string.IsNullOrEmpty(city) ? (object)DBNull.Value : (city.Length > 150 ? city.Substring(0, 150) : city));
+                        
+                        // MemM - nvarchar(200)
+                        cmd.Parameters.AddWithValue("@MemM", string.IsNullOrEmpty(email) ? (object)DBNull.Value : (email.Length > 200 ? email.Substring(0, 200) : email));
+                        
+                        // codemeli - nvarchar(12)
                         cmd.Parameters.AddWithValue("@codemeli", DBNull.Value);
-                        cmd.Parameters.AddWithValue("@datet", DateTime.Now);
+                        
+                        // datet - nvarchar(10) - فرمت: YYYY/MM/DD
+                        cmd.Parameters.AddWithValue("@datet", datet);
+                        
+                        // namefather - nvarchar(20)
                         cmd.Parameters.AddWithValue("@namefather", DBNull.Value);
-                        cmd.Parameters.AddWithValue("@codehesabdari", DBNull.Value);
+                        
+                        // codehesabdari - nvarchar(15) - NOT NULL - باید مقدار داشته باشد
+                        cmd.Parameters.AddWithValue("@codehesabdari", ""); // رشته خالی به جای null
                         
                         cmd.ExecuteNonQuery();
                     }
                     
                     // پاسخ موفقیت
-                    Response.Write("{\"status\":\"ok\",\"message\":\"اطلاعات با موفقیت ذخیره شد\",\"codeM\":\"" + codeM + "\"}");
+                    Response.Write("{\"status\":\"ok\",\"message\":\"اطلاعات با موفقیت ذخیره شد\",\"codeM\":\"" + codeM.ToString() + "\"}");
                 }
                 catch (SqlException sqlEx)
                 {
