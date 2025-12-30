@@ -76,6 +76,32 @@
             // تولید codeM یونیک (10 کاراکتر)
             string codeM = Guid.NewGuid().ToString().Replace("-", "").Substring(0, 10).ToUpper();
             
+            // تبدیل موبایل و کد پستی به عدد (اگر فیلد bigint باشد)
+            long? mobailM_long = null;
+            long? postM_long = null;
+            
+            // حذف کاراکترهای غیر عددی از موبایل (مثل فاصله، خط تیره و ...)
+            string mobailM_clean = mobailM.Replace(" ", "").Replace("-", "").Replace("(", "").Replace(")", "").Replace("+", "");
+            if (!string.IsNullOrEmpty(mobailM_clean))
+            {
+                long tempMobail;
+                if (long.TryParse(mobailM_clean, out tempMobail))
+                {
+                    mobailM_long = tempMobail;
+                }
+            }
+            
+            // حذف کاراکترهای غیر عددی از کد پستی
+            string postM_clean = postM.Replace(" ", "").Replace("-", "");
+            if (!string.IsNullOrEmpty(postM_clean))
+            {
+                long tempPost;
+                if (long.TryParse(postM_clean, out tempPost))
+                {
+                    postM_long = tempPost;
+                }
+            }
+            
             // اتصال به دیتابیس
             string connectionString = "Server=194.5.195.93;Database=millionaire;User Id=sa;Password=2901;";
             
@@ -106,8 +132,27 @@
                         cmd.Parameters.AddWithValue("@codeM", codeM);
                         cmd.Parameters.AddWithValue("@nameM", string.IsNullOrEmpty(nameM) ? (object)DBNull.Value : nameM);
                         cmd.Parameters.AddWithValue("@Tel1M", DBNull.Value);
-                        cmd.Parameters.AddWithValue("@mobailM", string.IsNullOrEmpty(mobailM) ? (object)DBNull.Value : mobailM);
-                        cmd.Parameters.AddWithValue("@postM", string.IsNullOrEmpty(postM) ? (object)DBNull.Value : postM);
+                        
+                        // اگر mobailM از نوع bigint است، عدد ارسال می‌کنیم
+                        if (mobailM_long.HasValue)
+                        {
+                            cmd.Parameters.AddWithValue("@mobailM", mobailM_long.Value);
+                        }
+                        else
+                        {
+                            cmd.Parameters.AddWithValue("@mobailM", DBNull.Value);
+                        }
+                        
+                        // اگر postM از نوع bigint است، عدد ارسال می‌کنیم
+                        if (postM_long.HasValue)
+                        {
+                            cmd.Parameters.AddWithValue("@postM", postM_long.Value);
+                        }
+                        else
+                        {
+                            cmd.Parameters.AddWithValue("@postM", DBNull.Value);
+                        }
+                        
                         cmd.Parameters.AddWithValue("@tedadkol", DBNull.Value);
                         cmd.Parameters.AddWithValue("@adresM", string.IsNullOrEmpty(city) ? (object)DBNull.Value : city);
                         cmd.Parameters.AddWithValue("@MemM", string.IsNullOrEmpty(email) ? (object)DBNull.Value : email);
