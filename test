@@ -1,0 +1,250 @@
+<%@ Page Language="C#" %>
+<%@ Import Namespace="System.Data" %>
+<%@ Import Namespace="System.Data.SqlClient" %>
+<%@ Import Namespace="System.IO" %>
+<%@ Import Namespace="System.Web.Script.Serialization" %>
+<%@ Import Namespace="System.Text" %>
+<%@ Import Namespace="System.Diagnostics" %>
+
+<script runat="server">
+    protected void Page_Load(object sender, EventArgs e)
+    {
+        Response.ContentType = "application/json; charset=utf-8";
+        Response.Charset = "utf-8";
+        
+        // لاگ فایل
+        string logPath = Server.MapPath("~/logs/test_log_" + DateTime.Now.ToString("yyyyMMdd") + ".txt");
+        Directory.CreateDirectory(Path.GetDirectoryName(logPath));
+        
+        StringBuilder log = new StringBuilder();
+        log.AppendLine("==========================================");
+        log.AppendLine("Test Log - " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+        log.AppendLine("==========================================");
+        
+        try
+        {
+            // خواندن داده‌های POST
+            string body = "";
+            using (StreamReader reader = new StreamReader(Request.InputStream, Encoding.UTF8))
+            {
+                body = reader.ReadToEnd();
+            }
+            
+            log.AppendLine("Request Method: " + Request.HttpMethod);
+            log.AppendLine("Content-Type: " + Request.ContentType);
+            log.AppendLine("Content-Length: " + Request.ContentLength);
+            log.AppendLine("Raw Body: " + body);
+            log.AppendLine("Body Length: " + (body != null ? body.Length : 0));
+            
+            if (string.IsNullOrEmpty(body))
+            {
+                log.AppendLine("ERROR: Body is empty!");
+                Response.Write("{\"status\":\"error\",\"message\":\"بدون داده\",\"log\":\"" + log.ToString().Replace("\"", "\\\"").Replace("\r\n", "\\n") + "\"}");
+                WriteLog(logPath, log.ToString());
+                return;
+            }
+            
+            // Deserialize JSON
+            var js = new JavaScriptSerializer();
+            dynamic data = null;
+            
+            try
+            {
+                data = js.DeserializeObject(body);
+                log.AppendLine("JSON Deserialized Successfully");
+                log.AppendLine("Data Type: " + (data != null ? data.GetType().ToString() : "null"));
+            }
+            catch (Exception ex)
+            {
+                log.AppendLine("ERROR in JSON Deserialization: " + ex.Message);
+                log.AppendLine("Stack Trace: " + ex.StackTrace);
+                Response.Write("{\"status\":\"error\",\"message\":\"خطا در پارس JSON: " + ex.Message + "\",\"log\":\"" + log.ToString().Replace("\"", "\\\"").Replace("\r\n", "\\n") + "\"}");
+                WriteLog(logPath, log.ToString());
+                return;
+            }
+            
+            if (data == null)
+            {
+                log.AppendLine("ERROR: Deserialized data is null");
+                Response.Write("{\"status\":\"error\",\"message\":\"داده null است\",\"log\":\"" + log.ToString().Replace("\"", "\\\"").Replace("\r\n", "\\n") + "\"}");
+                WriteLog(logPath, log.ToString());
+                return;
+            }
+            
+            // بررسی نوع درخواست (order یا customer)
+            string requestType = Request.QueryString["type"] ?? "order";
+            log.AppendLine("Request Type: " + requestType);
+            
+            if (requestType == "customer")
+            {
+                // تست customers.aspx
+                log.AppendLine("=== Testing Customer Data ===");
+                ProcessCustomerTest(data, log);
+            }
+            else
+            {
+                // تست save_order.aspx
+                log.AppendLine("=== Testing Order Data ===");
+                ProcessOrderTest(data, log);
+            }
+            
+            // نوشتن لاگ
+            WriteLog(logPath, log.ToString());
+            
+            // ارسال پاسخ
+            string logJson = log.ToString().Replace("\"", "\\\"").Replace("\r\n", "\\n");
+            Response.Write("{\"status\":\"ok\",\"message\":\"تست انجام شد\",\"log\":\"" + logJson + "\"}");
+        }
+        catch (Exception ex)
+        {
+            log.AppendLine("FATAL ERROR: " + ex.Message);
+            log.AppendLine("Stack Trace: " + ex.StackTrace);
+            WriteLog(logPath, log.ToString());
+            string logJson = log.ToString().Replace("\"", "\\\"").Replace("\r\n", "\\n");
+            Response.Write("{\"status\":\"error\",\"message\":\"خطای عمومی: " + ex.Message + "\",\"log\":\"" + logJson + "\"}");
+        }
+    }
+    
+    void ProcessCustomerTest(dynamic data, StringBuilder log)
+    {
+        log.AppendLine("--- Customer Data Analysis ---");
+        
+        // بررسی فیلدهای مورد نیاز
+        string name = "";
+        string mobile = "";
+        string email = "";
+        string city = "";
+        string postal_code = "";
+        
+        if (data is Dictionary<string, object>)
+        {
+            var dict = (Dictionary<string, object>)data;
+            log.AppendLine("Data is Dictionary with " + dict.Count + " keys");
+            
+            foreach (var key in dict.Keys)
+            {
+                log.AppendLine("Key: " + key + " = " + (dict[key] != null ? dict[key].ToString() : "null"));
+            }
+            
+            name = dict.ContainsKey("name") ? (dict["name"] != null ? dict["name"].ToString().Trim() : "") : "";
+            mobile = dict.ContainsKey("mobile") ? (dict["mobile"] != null ? dict["mobile"].ToString().Trim() : "") : "";
+            email = dict.ContainsKey("email") ? (dict["email"] != null ? dict["email"].ToString().Trim() : "") : "";
+            city = dict.ContainsKey("city") ? (dict["city"] != null ? dict["city"].ToString().Trim() : "") : "";
+            postal_code = dict.ContainsKey("postal_code") ? (dict["postal_code"] != null ? dict["postal_code"].ToString().Trim() : "") : "";
+        }
+        else
+        {
+            log.AppendLine("Data is not Dictionary, Type: " + data.GetType().ToString());
+        }
+        
+        log.AppendLine("Extracted Values:");
+        log.AppendLine("  name: '" + name + "'");
+        log.AppendLine("  mobile: '" + mobile + "'");
+        log.AppendLine("  email: '" + email + "'");
+        log.AppendLine("  city: '" + city + "'");
+        log.AppendLine("  postal_code: '" + postal_code + "'");
+        
+        // بررسی اعتبار داده‌ها
+        if (string.IsNullOrEmpty(name))
+        {
+            log.AppendLine("WARNING: name is empty!");
+        }
+        if (string.IsNullOrEmpty(mobile) && string.IsNullOrEmpty(email))
+        {
+            log.AppendLine("WARNING: Both mobile and email are empty!");
+        }
+    }
+    
+    void ProcessOrderTest(dynamic data, StringBuilder log)
+    {
+        log.AppendLine("--- Order Data Analysis ---");
+        
+        if (data is Dictionary<string, object>)
+        {
+            var dict = (Dictionary<string, object>)data;
+            log.AppendLine("Data is Dictionary with " + dict.Count + " keys");
+            
+            foreach (var key in dict.Keys)
+            {
+                log.AppendLine("Key: " + key + " = " + (dict[key] != null ? dict[key].ToString() : "null"));
+            }
+            
+            // بررسی فیلدهای اصلی
+            string customer = dict.ContainsKey("customer") ? (dict["customer"] != null ? dict["customer"].ToString().Trim() : "") : "";
+            string mobile = dict.ContainsKey("mobile") ? (dict["mobile"] != null ? dict["mobile"].ToString().Trim() : "") : "";
+            string email = dict.ContainsKey("email") ? (dict["email"] != null ? dict["email"].ToString().Trim() : "") : "";
+            string total = dict.ContainsKey("total") ? (dict["total"] != null ? dict["total"].ToString() : "0") : "0";
+            string order_notes = dict.ContainsKey("order_notes") ? (dict["order_notes"] != null ? dict["order_notes"].ToString().Trim() : "") : "";
+            
+            log.AppendLine("Main Fields:");
+            log.AppendLine("  customer: '" + customer + "'");
+            log.AppendLine("  mobile: '" + mobile + "'");
+            log.AppendLine("  email: '" + email + "'");
+            log.AppendLine("  total: '" + total + "'");
+            log.AppendLine("  order_notes: '" + order_notes + "'");
+            
+            // بررسی items
+            if (dict.ContainsKey("items"))
+            {
+                object itemsObj = dict["items"];
+                log.AppendLine("Items Type: " + (itemsObj != null ? itemsObj.GetType().ToString() : "null"));
+                
+                if (itemsObj is System.Collections.ArrayList)
+                {
+                    var itemsList = (System.Collections.ArrayList)itemsObj;
+                    log.AppendLine("Items Count: " + itemsList.Count);
+                    
+                    for (int i = 0; i < itemsList.Count; i++)
+                    {
+                        log.AppendLine("  Item[" + i + "]: " + (itemsList[i] != null ? itemsList[i].ToString() : "null"));
+                        
+                        if (itemsList[i] is Dictionary<string, object>)
+                        {
+                            var itemDict = (Dictionary<string, object>)itemsList[i];
+                            log.AppendLine("    Item[" + i + "] Keys: " + string.Join(", ", itemDict.Keys));
+                            foreach (var key in itemDict.Keys)
+                            {
+                                log.AppendLine("      " + key + ": " + (itemDict[key] != null ? itemDict[key].ToString() : "null"));
+                            }
+                        }
+                    }
+                }
+                else if (itemsObj is object[])
+                {
+                    var itemsArray = (object[])itemsObj;
+                    log.AppendLine("Items Count: " + itemsArray.Length);
+                    
+                    for (int i = 0; i < itemsArray.Length; i++)
+                    {
+                        log.AppendLine("  Item[" + i + "]: " + (itemsArray[i] != null ? itemsArray[i].ToString() : "null"));
+                    }
+                }
+                else
+                {
+                    log.AppendLine("WARNING: Items is not ArrayList or Array!");
+                }
+            }
+            else
+            {
+                log.AppendLine("ERROR: 'items' key not found in data!");
+            }
+        }
+        else
+        {
+            log.AppendLine("Data is not Dictionary, Type: " + data.GetType().ToString());
+        }
+    }
+    
+    void WriteLog(string logPath, string content)
+    {
+        try
+        {
+            File.AppendAllText(logPath, content + Environment.NewLine, Encoding.UTF8);
+        }
+        catch (Exception ex)
+        {
+            // اگر نتوانست لاگ بنویسد، در Response بنویس
+            Response.Write("<!-- Log Write Error: " + ex.Message + " -->");
+        }
+    }
+</script>
