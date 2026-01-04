@@ -114,16 +114,29 @@
 
                 try
                 {
-                    // فرض بر این است که User_ID در جدول dbo.Users شناسه خودکار (IDENTITY) است
+                    // محاسبه User_ID جدید (بزرگترین + 1)
+                    int nextUserId = 1;
+                    string maxIdQuery = "SELECT ISNULL(MAX(User_ID), 0) + 1 FROM dbo.Users";
+                    using (SqlCommand maxCmd = new SqlCommand(maxIdQuery, conn))
+                    {
+                        object result = maxCmd.ExecuteScalar();
+                        if (result != null && result != DBNull.Value)
+                        {
+                            nextUserId = Convert.ToInt32(result);
+                        }
+                    }
+
+                    // INSERT با User_ID محاسبه شده
                     string query = @"
                         INSERT INTO dbo.Users
-                            (User_Name, User_Password, User_FirstName, User_LastName, FK_Status_ID, FK_UserLevel_ID)
+                            (User_ID, User_Name, User_Password, User_FirstName, User_LastName, FK_Status_ID, FK_UserLevel_ID)
                         VALUES
-                            (@User_Name, @User_Password, @User_FirstName, @User_LastName, @FK_Status_ID, @FK_UserLevel_ID);
+                            (@User_ID, @User_Name, @User_Password, @User_FirstName, @User_LastName, @FK_Status_ID, @FK_UserLevel_ID);
                     ";
 
                     using (SqlCommand cmd = new SqlCommand(query, conn))
                     {
+                        cmd.Parameters.AddWithValue("@User_ID", nextUserId);
                         cmd.Parameters.AddWithValue("@User_Name", username);
                         cmd.Parameters.AddWithValue("@User_Password", password);
                         cmd.Parameters.AddWithValue("@User_FirstName", firstName);
