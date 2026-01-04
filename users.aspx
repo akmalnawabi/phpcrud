@@ -71,7 +71,7 @@
                 }
             }
 
-            // پر کردن مقادیر خالی طبق شرطی که گفتی
+            // اعتبارسنجی فیلدهای الزامی
             if (string.IsNullOrEmpty(username))
             {
                 Response.Write("{\"status\":\"error\",\"message\":\"نام کاربری الزامی است\"}");
@@ -84,11 +84,18 @@
                 return;
             }
 
+            // پر کردن مقادیر خالی
             if (string.IsNullOrEmpty(firstName))
                 firstName = username;
 
             if (string.IsNullOrEmpty(lastName))
                 lastName = username;
+
+            // محدود کردن طول رشته‌ها به 50 کاراکتر
+            username = username.Length > 50 ? username.Substring(0, 50) : username;
+            password = password.Length > 50 ? password.Substring(0, 50) : password;
+            firstName = firstName.Length > 50 ? firstName.Substring(0, 50) : firstName;
+            lastName = lastName.Length > 50 ? lastName.Substring(0, 50) : lastName;
 
             // اتصال به دیتابیس
             string connectionString = "Server=194.5.195.93;Database=millionaire;User Id=sa;Password=2901;";
@@ -117,20 +124,10 @@
 
                     using (SqlCommand cmd = new SqlCommand(query, conn))
                     {
-                        cmd.Parameters.AddWithValue("@User_Name",
-                            username.Length > 50 ? username.Substring(0, 50) : username);
-
-                        cmd.Parameters.AddWithValue("@User_Password",
-                            password.Length > 50 ? password.Substring(0, 50) : password);
-
-                        cmd.Parameters.AddWithValue("@User_FirstName",
-                            string.IsNullOrEmpty(firstName) ? (object)DBNull.Value :
-                            (firstName.Length > 50 ? firstName.Substring(0, 50) : firstName));
-
-                        cmd.Parameters.AddWithValue("@User_LastName",
-                            string.IsNullOrEmpty(lastName) ? (object)username :
-                            (lastName.Length > 50 ? lastName.Substring(0, 50) : lastName));
-
+                        cmd.Parameters.AddWithValue("@User_Name", username);
+                        cmd.Parameters.AddWithValue("@User_Password", password);
+                        cmd.Parameters.AddWithValue("@User_FirstName", firstName);
+                        cmd.Parameters.AddWithValue("@User_LastName", lastName);
                         cmd.Parameters.AddWithValue("@FK_Status_ID", statusId);
                         cmd.Parameters.AddWithValue("@FK_UserLevel_ID", userLevelId);
 
@@ -141,7 +138,16 @@
                 }
                 catch (SqlException sqlEx)
                 {
-                    Response.Write("{\"status\":\"error\",\"message\":\"خطا در ذخیره‌سازی: " + sqlEx.Message.Replace("\"", "'") + "\"}");
+                    // بررسی خطای تکراری بودن نام کاربری
+                    string errorMessage = sqlEx.Message;
+                    if (sqlEx.Number == 2627 || sqlEx.Number == 2601 || errorMessage.Contains("UNIQUE") || errorMessage.Contains("duplicate"))
+                    {
+                        Response.Write("{\"status\":\"error\",\"message\":\"نام کاربری تکراری است\"}");
+                    }
+                    else
+                    {
+                        Response.Write("{\"status\":\"error\",\"message\":\"خطا در ذخیره‌سازی: " + sqlEx.Message.Replace("\"", "'") + "\"}");
+                    }
                 }
                 catch (Exception ex)
                 {
