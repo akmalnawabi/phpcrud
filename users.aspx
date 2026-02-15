@@ -3,6 +3,8 @@
 <%@ Import Namespace="System.Data.SqlClient" %>
 <%@ Import Namespace="System.IO" %>
 <%@ Import Namespace="System.Web.Script.Serialization" %>
+<%@ Import Namespace="System.Text" %>
+<%@ Import Namespace="System.Configuration" %>
 
 <script runat="server">
     protected void Page_Load(object sender, EventArgs e)
@@ -13,7 +15,7 @@
         try
         {
             // خواندن بدنه درخواست (JSON)
-            string body = new StreamReader(Request.InputStream).ReadToEnd();
+            string body = new StreamReader(Request.InputStream, Encoding.UTF8).ReadToEnd();
 
             if (string.IsNullOrEmpty(body))
             {
@@ -97,8 +99,16 @@
             firstName = firstName.Length > 50 ? firstName.Substring(0, 50) : firstName;
             lastName = lastName.Length > 50 ? lastName.Substring(0, 50) : lastName;
 
-            // اتصال به دیتابیس
-            string connectionString = "Server=194.5.195.93;Database=millionaire;User Id=sa;Password=2901;";
+            // ==========================================
+            // خواندن Connection String از web.config
+            // ==========================================
+            string connectionString = string.Format(
+                "Server={0};Database={1};User Id={2};Password={3};",
+                ConfigurationManager.AppSettings["DbServer"],
+                ConfigurationManager.AppSettings["DbName"],
+                ConfigurationManager.AppSettings["DbUser"],
+                ConfigurationManager.AppSettings["DbPassword"]
+            );
 
             using (SqlConnection conn = new SqlConnection(connectionString))
             {
