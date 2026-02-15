@@ -27,13 +27,15 @@ protected void Page_Load(object sender, EventArgs e)
         {
             conn.Open();
             
-            // کوئری گرفتن کالاها
+            // کوئری گرفتن کالاها - همه ستون‌های مورد نیاز
             string query = @"
                 SELECT 
                     codek,
                     namek,
                     price_sale1,
-                    price_buy1
+                    price_sale15,
+                    price_buy1,
+                    vahedk
                 FROM dbo.kalas 
                 WHERE ISNULL(namek, '') <> ''
                 ORDER BY namek";
@@ -48,8 +50,10 @@ protected void Page_Load(object sender, EventArgs e)
                         {
                             codek = reader["codek"] != DBNull.Value ? reader["codek"].ToString().Trim() : "",
                             namek = reader["namek"] != DBNull.Value ? reader["namek"].ToString().Trim() : "",
-                            price_sale1 = reader["price_sale1"] != DBNull.Value ? Convert.ToDecimal(reader["price_sale1"]) : 0,
-                            price_buy1 = reader["price_buy1"] != DBNull.Value ? Convert.ToDecimal(reader["price_buy1"]) : 0
+                            price_sale1 = reader["price_sale1"] != DBNull.Value ? reader["price_sale1"].ToString().Trim() : "0",
+                            price_sale15 = reader["price_sale15"] != DBNull.Value ? reader["price_sale15"].ToString().Trim() : "0",
+                            price_buy1 = reader["price_buy1"] != DBNull.Value ? reader["price_buy1"].ToString().Trim() : "0",
+                            vahedk = reader["vahedk"] != DBNull.Value ? reader["vahedk"].ToString().Trim() : ""
                         };
                         
                         items.Add(item);
