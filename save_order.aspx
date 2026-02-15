@@ -117,7 +117,19 @@ protected void Page_Load(object sender, EventArgs e)
             return;
         }
 
-        string connectionString = "Server=194.5.195.93;Database=millionaire;User Id=sa;Password=2901;";
+
+        // خواندن از web.config
+        string connectionString = string.Format(
+            "Server={0};Database={1};User Id={2};Password={3};",
+            ConfigurationManager.AppSettings["DbServer"],
+            ConfigurationManager.AppSettings["DbName"],
+            ConfigurationManager.AppSettings["DbUser"],
+            ConfigurationManager.AppSettings["DbPassword"]
+        );
+
+        // اضافه کنید برای تست:
+        log.AppendLine("Config loaded - Server: " + ConfigurationManager.AppSettings["DbServer"]);
+        log.AppendLine("Config loaded - Database: " + ConfigurationManager.AppSettings["DbName"]);
 
         using (SqlConnection conn = new SqlConnection(connectionString))
         {
