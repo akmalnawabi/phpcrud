@@ -58,19 +58,17 @@ protected void Page_Load(object sender, EventArgs e)
             
             // کوئری - همه فیلدهای جدول kala
             string query = @"
-                SELECT 
-                    ISNULL(codek, '') AS codek,
-                    ISNULL(namek, N'بدون نام') AS namek,
-                    ISNULL(price_sale1, 0) AS price_sale1,
-                    ISNULL(price_buy1, 0) AS price_buy1,
-                    ISNULL(tedad, 0) AS tedad,
-                    ISNULL(unit, N'عدد') AS unit,
-                    ISNULL(description, N'') AS description,
-                    ISNULL(category_id, N'') AS category_id,
-                    ISNULL(active, 1) AS active
-                FROM dbo.kala 
-                WHERE active = 1
-                ORDER BY codek";
+SELECT 
+    ISNULL(codek,'') AS codek,
+    ISNULL(namek,N'بدون نام') AS namek,
+    ISNULL(price_sale1,0) AS price_sale1,
+    ISNULL(price_buy1,0) AS price_buy1,
+    ISNULL(vahedk,N'عدد') AS unit,
+    ISNULL(groupkala,'') AS category,
+    ISNULL(sharh,N'') AS description,
+    ISNULL(tedadmenu,0) AS stock
+FROM dbo.kala
+ORDER BY codek";
             
             using (SqlCommand cmd = new SqlCommand(query, conn))
             {
@@ -79,18 +77,17 @@ protected void Page_Load(object sender, EventArgs e)
                     while (reader.Read())
                     {
                         var item = new System.Collections.Generic.Dictionary<string, string>();
-                        
-                        item["codek"] = reader["codek"].ToString();
-                        item["namek"] = reader["namek"].ToString();
-                        item["price_sale1"] = reader["price_sale1"].ToString();
-                        item["price_buy1"] = reader["price_buy1"].ToString();
-                        item["tedad"] = reader["tedad"].ToString();
-                        item["unit"] = reader["unit"].ToString();
-                        item["description"] = reader["description"].ToString();
-                        item["category_id"] = reader["category_id"].ToString();
-                        item["active"] = reader["active"].ToString();
-                        
-                        items.Add(item);
+
+item["sku"] = reader["codek"].ToString();
+item["name"] = reader["namek"].ToString();
+item["regular_price"] = reader["price_sale1"].ToString();
+item["cost_price"] = reader["price_buy1"].ToString();
+item["unit"] = reader["unit"].ToString();
+item["category"] = reader["category"].ToString();
+item["description"] = reader["description"].ToString();
+item["stock"] = reader["stock"].ToString();
+
+items.Add(item);
                     }
                 }
             }
