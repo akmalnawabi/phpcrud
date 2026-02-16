@@ -146,7 +146,7 @@ items.Add(item);
 }
 </script>
 
-
+// for test
 string dbServer = "194.5.195.93";
 string dbName = "millionaire";
 string dbUser = "sa";
