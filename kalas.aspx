@@ -3,6 +3,7 @@
 <%@ Import Namespace="System.Data.SqlClient" %>
 <%@ Import Namespace="System.Web.Script.Serialization" %>
 <%@ Import Namespace="System.Configuration" %>
+<%@ Import Namespace="System.Text" %>
 
 <script runat="server">
 protected void Page_Load(object sender, EventArgs e)
