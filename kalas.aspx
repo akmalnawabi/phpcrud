@@ -10,35 +10,66 @@ protected void Page_Load(object sender, EventArgs e)
     Response.ContentType = "application/json; charset=utf-8";
     Response.Charset = "utf-8";
     
+    StringBuilder log = new StringBuilder();
+    
     try
     {
-        // خواندن Connection String از web.config
-        string connectionString = string.Format(
-            "Server={0};Database={1};User Id={2};Password={3};",
-            ConfigurationManager.AppSettings["DbServer"],
-            ConfigurationManager.AppSettings["DbName"],
-            ConfigurationManager.AppSettings["DbUser"],
-            ConfigurationManager.AppSettings["DbPassword"]
-        );
-
-        var items = new System.Collections.Generic.List<object>();
+        log.AppendLine("=== get_kalas.aspx Started ===");
+        log.AppendLine("Time: " + DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss"));
+        
+        // ==========================================
+        // خواندن تنظیمات از web.config - C# قدیمی
+        // ==========================================
+        string dbServer = ConfigurationManager.AppSettings["DbServer"];
+        string dbName = ConfigurationManager.AppSettings["DbName"];
+        string dbUser = ConfigurationManager.AppSettings["DbUser"];
+        string dbPassword = ConfigurationManager.AppSettings["DbPassword"];
+        string customerId = ConfigurationManager.AppSettings["CustomerId"];
+        
+        // بررسی null با ?: (C# قدیمی)
+        if (string.IsNullOrEmpty(dbServer)) dbServer = "localhost";
+        if (string.IsNullOrEmpty(dbName)) dbName = "database";
+        if (string.IsNullOrEmpty(dbUser)) dbUser = "user";
+        if (string.IsNullOrEmpty(dbPassword)) dbPassword = "";
+        if (string.IsNullOrEmpty(customerId)) customerId = "default";
+        
+        log.AppendLine("Config loaded - Server: " + dbServer + ", Database: " + dbName);
+        
+        // ==========================================
+        // ساخت Connection String - C# قدیمی
+        // ==========================================
+        string connectionString = "Server=" + dbServer + 
+                                  ";Database=" + dbName + 
+                                  ";User Id=" + dbUser + 
+                                  ";Password=" + dbPassword + ";";
+        
+        log.AppendLine("Connection string built");
+        
+        // ==========================================
+        // اتصال به دیتابیس
+        // ==========================================
+        var items = new System.Collections.Generic.List<System.Collections.Generic.Dictionary<string, string>>();
         
         using (SqlConnection conn = new SqlConnection(connectionString))
         {
             conn.Open();
+            log.AppendLine("Database connected");
             
-            // کوئری گرفتن کالاها - همه ستون‌های مورد نیاز
+            // کوئری - همه فیلدهای جدول kala
             string query = @"
                 SELECT 
-                    codek,
-                    namek,
-                    price_sale1,
-                    price_sale15,
-                    price_buy1,
-                    vahedk
-                FROM dbo.kalas 
-                WHERE ISNULL(namek, '') <> ''
-                ORDER BY namek";
+                    ISNULL(codek, '') AS codek,
+                    ISNULL(namek, N'بدون نام') AS namek,
+                    ISNULL(price_sale1, 0) AS price_sale1,
+                    ISNULL(price_buy1, 0) AS price_buy1,
+                    ISNULL(tedad, 0) AS tedad,
+                    ISNULL(unit, N'عدد') AS unit,
+                    ISNULL(description, N'') AS description,
+                    ISNULL(category_id, N'') AS category_id,
+                    ISNULL(active, 1) AS active
+                FROM dbo.kala 
+                WHERE active = 1
+                ORDER BY codek";
             
             using (SqlCommand cmd = new SqlCommand(query, conn))
             {
@@ -46,15 +77,17 @@ protected void Page_Load(object sender, EventArgs e)
                 {
                     while (reader.Read())
                     {
-                        var item = new
-                        {
-                            codek = reader["codek"] != DBNull.Value ? reader["codek"].ToString().Trim() : "",
-                            namek = reader["namek"] != DBNull.Value ? reader["namek"].ToString().Trim() : "",
-                            price_sale1 = reader["price_sale1"] != DBNull.Value ? reader["price_sale1"].ToString().Trim() : "0",
-                            price_sale15 = reader["price_sale15"] != DBNull.Value ? reader["price_sale15"].ToString().Trim() : "0",
-                            price_buy1 = reader["price_buy1"] != DBNull.Value ? reader["price_buy1"].ToString().Trim() : "0",
-                            vahedk = reader["vahedk"] != DBNull.Value ? reader["vahedk"].ToString().Trim() : ""
-                        };
+                        var item = new System.Collections.Generic.Dictionary<string, string>();
+                        
+                        item["codek"] = reader["codek"].ToString();
+                        item["namek"] = reader["namek"].ToString();
+                        item["price_sale1"] = reader["price_sale1"].ToString();
+                        item["price_buy1"] = reader["price_buy1"].ToString();
+                        item["tedad"] = reader["tedad"].ToString();
+                        item["unit"] = reader["unit"].ToString();
+                        item["description"] = reader["description"].ToString();
+                        item["category_id"] = reader["category_id"].ToString();
+                        item["active"] = reader["active"].ToString();
                         
                         items.Add(item);
                     }
@@ -62,12 +95,17 @@ protected void Page_Load(object sender, EventArgs e)
             }
         }
         
-        // ساخت پاسخ JSON
+        log.AppendLine("Items loaded: " + items.Count);
+        
+        // ==========================================
+        // ساخت JSON پاسخ
+        // ==========================================
         var result = new
         {
             status = "ok",
             count = items.Count,
-            items = items
+            items = items,
+            log = log.ToString()
         };
         
         var serializer = new JavaScriptSerializer();
@@ -76,25 +114,34 @@ protected void Page_Load(object sender, EventArgs e)
     }
     catch (SqlException sqlEx)
     {
-        Response.StatusCode = 500;
+        log.AppendLine("SQL ERROR: " + sqlEx.Message);
+        
         var error = new
         {
             status = "error",
             message = "خطای SQL: " + sqlEx.Message,
-            items = new object[] { }
+            items = new object[] { },
+            log = log.ToString()
         };
+        
+        Response.StatusCode = 500;
         var serializer = new JavaScriptSerializer();
         Response.Write(serializer.Serialize(error));
     }
     catch (Exception ex)
     {
-        Response.StatusCode = 500;
+        log.AppendLine("ERROR: " + ex.Message);
+        log.AppendLine("Stack: " + ex.StackTrace);
+        
         var error = new
         {
             status = "error",
             message = "خطا: " + ex.Message,
-            items = new object[] { }
+            items = new object[] { },
+            log = log.ToString()
         };
+        
+        Response.StatusCode = 500;
         var serializer = new JavaScriptSerializer();
         Response.Write(serializer.Serialize(error));
     }
