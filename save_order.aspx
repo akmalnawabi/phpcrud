@@ -143,24 +143,31 @@ protected void Page_Load(object sender, EventArgs e)
             long newNoFact = lastNoFact + 1;
             log.AppendLine("Last NoFact: " + lastNoFact + ", New NoFact: " + newNoFact);
 
-            // بررسی order_id
-            long wordpressOrderId = 0;
-            if (long.TryParse(dict["order_id"].ToString(), out wordpressOrderId))
-            {
-                log.AppendLine("WordPress Order ID: " + wordpressOrderId);
-                SqlCommand cmdCheck = new SqlCommand("SELECT COUNT(*) FROM dbo.sale_title WHERE NoFact = @NoFact", conn);
-                cmdCheck.Parameters.AddWithValue("@NoFact", wordpressOrderId);
-                int exists = Convert.ToInt32(cmdCheck.ExecuteScalar());
-                log.AppendLine("Order ID exists check: " + exists);
-                
-                if (exists == 0)
-                {
-                    newNoFact = wordpressOrderId;
-                    log.AppendLine("Using WordPress Order ID as NoFact: " + newNoFact);
-                }
-            }
+// بررسی order_id
+long wordpressOrderId = 0;
+if (long.TryParse(dict["order_id"].ToString(), out wordpressOrderId))
+{
+    log.AppendLine("WordPress Order ID: " + wordpressOrderId);
+    SqlCommand cmdCheck = new SqlCommand("SELECT COUNT(*) FROM dbo.sale_title WHERE NoFact = @NoFact", conn);
+    cmdCheck.Parameters.AddWithValue("@NoFact", wordpressOrderId);
+    int exists = Convert.ToInt32(cmdCheck.ExecuteScalar());
+    log.AppendLine("Order ID exists check: " + exists);
+    
+    if (exists > 0)
+    {
+        // اگر وجود داشت، اول پاکش کن
+        SqlCommand cmdDelete = new SqlCommand("DELETE FROM sale_detaile WHERE NoFact = @NoFact; DELETE FROM sale_title WHERE NoFact = @NoFact;", conn);
+        cmdDelete.Parameters.AddWithValue("@NoFact", wordpressOrderId);
+        cmdDelete.ExecuteNonQuery();
+        log.AppendLine("Deleted existing order with NoFact: " + wordpressOrderId);
+    }
+    
+    // حالا از شماره وردپرس استفاده کن
+    newNoFact = wordpressOrderId;
+    log.AppendLine("Using WordPress Order ID as NoFact: " + newNoFact);
+}
 
-            orderIdStr = newNoFact.ToString();
+orderIdStr = newNoFact.ToString();
 
             // آماده‌سازی داده‌ها با محدودیت طول
             string firstName = dict.ContainsKey("first_name") ? (dict["first_name"] != null ? dict["first_name"].ToString().Trim() : "") : "";
